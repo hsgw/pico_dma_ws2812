@@ -1,0 +1,3 @@
+example/build/**
+!example/build/.gitkeep
+.vscode/**
