@@ -10,5 +10,5 @@ target_include_directories(pico_dma_ws2812 INTERFACE
 ${CMAKE_CURRENT_LIST_DIR})
 
 target_link_libraries(pico_dma_ws2812 INTERFACE
-    pico_stdlib hardware_pio hardware_dma pico_multicore
+    pico_stdlib hardware_pio hardware_dma
 )
