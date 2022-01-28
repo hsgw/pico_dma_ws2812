@@ -3,12 +3,14 @@
 
 #include "pico_dma_ws2812.hpp"
 
+#include <cstring>
+#include "stdio.h"
+
 int WS2812::dma_channel;
 volatile mutex_t WS2812::data_send_mutex;
 
-WS2812::WS2812(uint num_leds, PIO pio, uint sm, uint pin, uint freq,
-               GRB *buffer)
-    : buffer(buffer), num_leds(num_leds), pio(pio), sm(sm) {
+WS2812::WS2812(uint num_leds, PIO pio, uint sm, uint pin, uint freq)
+    : num_leds(num_leds), pio(pio), sm(sm) {
     pio_program_offset = pio_add_program(pio, &ws2812_program);
 
     pio_gpio_init(pio, pin);
@@ -34,7 +36,8 @@ WS2812::WS2812(uint num_leds, PIO pio, uint sm, uint pin, uint freq,
     channel_config_set_transfer_data_size(&config, DMA_SIZE_32);
     channel_config_set_read_increment(&config, true);
     dma_channel_set_trans_count(dma_channel, num_leds, false);
-    dma_channel_set_read_addr(dma_channel, (uint32_t *)buffer, false);
+    dma_channel_set_read_addr(dma_channel, (uint32_t *)buffer[BUFFER_OUT],
+                              false);
     dma_channel_configure(dma_channel, &config, &pio->txf[sm], NULL, 0, false);
 
     dma_channel_set_irq0_enabled(dma_channel, true);
@@ -42,14 +45,17 @@ WS2812::WS2812(uint num_leds, PIO pio, uint sm, uint pin, uint freq,
     irq_set_enabled(DMA_IRQ_0, true);
 
     mutex_init(const_cast<mutex_t *>(&data_send_mutex));
+    mutex_init(&flip_buffer_mutex);
 
-    if (!this->buffer) {
-        this->buffer   = new GRB[num_leds];
-        managed_buffer = true;
+    buffer = new GRB *[BUFFER_COUNT];
+    for (uint i = 0; i < BUFFER_COUNT; i++) {
+        buffer[i] = new GRB[num_leds];
     }
 }
 
 bool WS2812::update(bool blocking) {
+    if (!request_send) return false;
+
     bool mutex_owned =
         mutex_try_enter(const_cast<mutex_t *>(&data_send_mutex), NULL);
 
@@ -57,6 +63,12 @@ bool WS2812::update(bool blocking) {
 
     if (!mutex_owned)
         mutex_enter_blocking(const_cast<mutex_t *>(&data_send_mutex));
+
+    // copy buffer to out
+    mutex_enter_blocking(&flip_buffer_mutex);
+    memcpy(buffer[BUFFER_OUT], buffer[BUFFER_IN], sizeof(GRB) * num_leds);
+    request_send = false;
+    mutex_exit(&flip_buffer_mutex);
 
     add_alarm_in_us(LED_RESET_TIME, reset_time_alert_callback, (void *)this,
                     false);
@@ -70,7 +82,7 @@ bool WS2812::update(bool blocking) {
 
 void WS2812::send() {
     dma_channel_set_trans_count(dma_channel, num_leds, false);
-    dma_channel_set_read_addr(dma_channel, buffer, true);
+    dma_channel_set_read_addr(dma_channel, buffer[BUFFER_OUT], true);
 }
 
 int64_t WS2812::reset_time_alert_callback(alarm_id_t id, void *user_data) {
@@ -80,7 +92,6 @@ int64_t WS2812::reset_time_alert_callback(alarm_id_t id, void *user_data) {
 }
 
 void WS2812::dma_complete_callback() {
-    // add_alarm_in_us(200, reset_time_alert_callback, NULL, false);
     mutex_exit(const_cast<mutex_t *>(&data_send_mutex));
     dma_hw->ints0 = 1u << WS2812::dma_channel;
 }
@@ -122,5 +133,8 @@ void WS2812::set_hsv(uint32_t index, float h, float s, float v) {
 }
 
 void WS2812::set_rgb(uint32_t index, uint8_t r, uint8_t g, uint8_t b) {
-    buffer[index].rgb(r, g, b);
+    mutex_enter_blocking(&flip_buffer_mutex);
+    buffer[BUFFER_IN][index].rgb(r, g, b);
+    request_send = true;
+    mutex_exit(&flip_buffer_mutex);
 }
