@@ -4,7 +4,7 @@
 #include "pico_dma_ws2812.hpp"
 
 int WS2812::dma_channel;
-mutex_t WS2812::data_send_mutex;
+volatile mutex_t WS2812::data_send_mutex;
 
 WS2812::WS2812(uint num_leds, PIO pio, uint sm, uint pin, uint freq,
                GRB *buffer)

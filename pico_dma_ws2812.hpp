@@ -67,7 +67,7 @@ class WS2812 {
     }
 
     static int dma_channel;
-    static mutex_t data_send_mutex;
+    volatile static mutex_t data_send_mutex;
     GRB *buffer;
     uint32_t num_leds;
 
@@ -86,5 +86,4 @@ class WS2812 {
     uint sm;
     uint pio_program_offset;
     bool managed_buffer = false;
-    uint current_buffer = 0;
 };
