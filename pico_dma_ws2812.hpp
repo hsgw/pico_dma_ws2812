@@ -30,6 +30,10 @@ class WS2812 {
     static constexpr uint DEFAULT_SERIAL_FREQ = SERIAL_FREQ_800KHZ;
     static constexpr uint LED_RESET_TIME      = 400;
 
+    static constexpr uint BUFFER_COUNT = 2;
+    static constexpr uint BUFFER_IN    = 0;
+    static constexpr uint BUFFER_OUT   = 1;
+
 #pragma pack(push, 1)
     union alignas(4) GRB {
         struct {
@@ -49,7 +53,7 @@ class WS2812 {
 #pragma pack(pop)
 
     WS2812(uint num_leds, PIO pio, uint sm, uint pin,
-           uint freq = DEFAULT_SERIAL_FREQ, GRB *buffer = nullptr);
+           uint freq = DEFAULT_SERIAL_FREQ);
     ~WS2812() {
         clear();
         update(true);
@@ -60,15 +64,16 @@ class WS2812 {
         // pio_sm_unclaim seems to hardfault in MicroPython
         pio_sm_unclaim(pio, sm);
 #endif
-        if (managed_buffer) {
-            // Only delete buffers we have allocated ourselves.
-            delete[] buffer;
+        // Only delete buffers we have allocated ourselves.
+        for (uint i = 0; i < BUFFER_COUNT; i++) {
+            delete[] buffer[i];
         }
+        delete[] buffer;
     }
 
     static int dma_channel;
     volatile static mutex_t data_send_mutex;
-    GRB *buffer;
+    GRB **buffer;
     uint32_t num_leds;
 
     static int64_t reset_time_alert_callback(alarm_id_t id, void *user_data);
@@ -79,11 +84,11 @@ class WS2812 {
     void clear();
     void set_hsv(uint32_t index, float h, float s, float v);
     void set_rgb(uint32_t index, uint8_t r, uint8_t g, uint8_t b);
-    GRB get(uint32_t index) { return buffer[index]; };
 
    private:
     PIO pio;
     uint sm;
     uint pio_program_offset;
-    bool managed_buffer = false;
+    bool request_send = false;
+    mutex_t flip_buffer_mutex;
 };
