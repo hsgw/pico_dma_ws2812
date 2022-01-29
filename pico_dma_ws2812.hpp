@@ -73,8 +73,6 @@ class WS2812 {
 
     static int dma_channel;
     volatile static mutex_t data_send_mutex;
-    GRB **buffer;
-    uint32_t num_leds;
 
     static int64_t reset_time_alert_callback(alarm_id_t id, void *user_data);
     static void dma_complete_callback();
@@ -89,6 +87,8 @@ class WS2812 {
     PIO pio;
     uint sm;
     uint pio_program_offset;
+    uint32_t num_leds;
+    GRB **buffer;
     bool request_send = false;
     mutex_t flip_buffer_mutex;
 };

@@ -133,6 +133,8 @@ void WS2812::set_hsv(uint32_t index, float h, float s, float v) {
 }
 
 void WS2812::set_rgb(uint32_t index, uint8_t r, uint8_t g, uint8_t b) {
+    if (index >= num_leds) return;
+
     mutex_enter_blocking(&flip_buffer_mutex);
     buffer[BUFFER_IN][index].rgb(r, g, b);
     request_send = true;
