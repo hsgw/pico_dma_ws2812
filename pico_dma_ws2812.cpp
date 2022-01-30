@@ -11,6 +11,11 @@ volatile mutex_t WS2812::data_send_mutex;
 
 WS2812::WS2812(uint num_leds, PIO pio, uint sm, uint pin, uint freq)
     : num_leds(num_leds), pio(pio), sm(sm) {
+    buffer = new GRB *[BUFFER_COUNT];
+    for (uint i = 0; i < BUFFER_COUNT; i++) {
+        buffer[i] = new GRB[num_leds];
+    }
+
     pio_program_offset = pio_add_program(pio, &ws2812_program);
 
     pio_gpio_init(pio, pin);
@@ -40,17 +45,13 @@ WS2812::WS2812(uint num_leds, PIO pio, uint sm, uint pin, uint freq)
                               false);
     dma_channel_configure(dma_channel, &config, &pio->txf[sm], NULL, 0, false);
 
+    // DMA complete irq setting
     dma_channel_set_irq0_enabled(dma_channel, true);
     irq_set_exclusive_handler(DMA_IRQ_0, dma_complete_callback);
     irq_set_enabled(DMA_IRQ_0, true);
 
     mutex_init(const_cast<mutex_t *>(&data_send_mutex));
     mutex_init(&flip_buffer_mutex);
-
-    buffer = new GRB *[BUFFER_COUNT];
-    for (uint i = 0; i < BUFFER_COUNT; i++) {
-        buffer[i] = new GRB[num_leds];
-    }
 }
 
 bool WS2812::update(bool blocking) {
