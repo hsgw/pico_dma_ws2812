@@ -78,6 +78,7 @@ class WS2812 {
     static void dma_complete_callback();
 
     bool update(bool blocking = false);
+    void set_request_send();
     void send();
     void clear();
     void set_hsv(uint32_t index, float h, float s, float v);

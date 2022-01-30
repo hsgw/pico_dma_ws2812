@@ -86,6 +86,12 @@ void WS2812::send() {
     dma_channel_set_read_addr(dma_channel, buffer[BUFFER_OUT], true);
 }
 
+void WS2812::set_request_send() {
+    mutex_enter_blocking(&flip_buffer_mutex);
+    request_send = true;
+    mutex_exit(&flip_buffer_mutex);
+}
+
 int64_t WS2812::reset_time_alert_callback(alarm_id_t id, void *user_data) {
     WS2812 *ws2812 = static_cast<WS2812 *>(user_data);
     ws2812->send();
